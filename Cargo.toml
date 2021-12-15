@@ -1,11 +1,8 @@
 [package]
 name = "regrate"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 description = "Better migrations using hashes for names instead of serial numbers or dates"
 repository = "https://github.com/clord/regrate"
 license = "MIT OR Apache-2.0"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
