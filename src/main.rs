@@ -7,14 +7,18 @@ use clap_generate::{generate, Shell};
 enum Regrate {
     /// Init a new migration
     Init(InitArgs),
+
     /// Run migrations in order
     Run(RunArgs),
+
     /// Commit change to migration
     Commit(CommitArgs),
-    /// Resolve conflict markers into new migration
-    Resolve,
+
     /// Generate completions for your shell
     Generate(GenerateArgs),
+
+    /// Resolve conflict markers into new migration
+    Resolve,
 }
 
 #[derive(Args, Debug)]
