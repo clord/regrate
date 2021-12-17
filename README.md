@@ -6,25 +6,34 @@ Manage migrations, apply them in order, deal with merge conflicts.
 
     # create a new shell-based migration
     regrate init --shell
+
     # Edit the up and down scripts (bash since --shell was used)
     edit regrate/latest/up.sh
     edit regrate/latest/down.sh
+
     # Run the current migration (to test it out) by passing them to bash in order
     regrate run -- bash {}
+
     # Once the migration is working right, we can commit it.
     regrate commit -m "add two columns"
+
     # With our migrations complete, we can push it up!
     git add -A && git commit -m "initial migration"
+
     # Try to push it. first rebase onto latest...
-    git rebase main ## ERROR, conflicts! 
+    git rebase main ## ERROR, conflicts!
+
     # Someone else already pushed a migration. you can either:
     # 1. merge the migrations together (you're in dev and willing to reset your db)
     # 2. better idea would be to move your local changes to a new migration:
     regrate resolve
+
     # regrate-resolve moves your local changes into a new migration, 
     # leaving your peer's as the base.
     edit regrate/latest/up.sh # your peer added one of your columns!
+
     regrate commit -m "add one column"
+
     git add -A && git rebase --continue
     git push # Yay!
 
@@ -48,6 +57,7 @@ This can be used in a pre-commit hook to detect bad changes.
 Also provided is a library that can be used to iterate migrations
 in the current directory. This is helpful for runtime. In this case,
 it is your responsibility to invoke the scripts as you see fit.
+Packages for other languages also exist and let you run migrations.
 
 [![Crates.io](https://img.shields.io/crates/v/regrate.svg)](https://crates.io/crates/regrate)
 [![Docs.rs](https://docs.rs/regrate/badge.svg)](https://docs.rs/regrate)
@@ -60,7 +70,19 @@ it is your responsibility to invoke the scripts as you see fit.
 
 * Install the rust toolchain in order to have cargo installed by following
   [this](https://www.rust-lang.org/tools/install) guide.
-* run `cargo install regrate`
+* Run `cargo install regrate`
+
+## How it works
+
+The "current version" is left open.
+You can make changes to it,
+and its name is always well known.
+If two people try to change the open version, it will be a merge conflict.
+To compute the next version from the current version, take the current version string,
+compute the hash of all migration scripts in that version,
+and concatenate the version and the hash.
+Hash the result and this is your next version name.
+This sequence can be repeated to generate a list of names.
 
 ## License
 
