@@ -1,15 +1,23 @@
+use std::path::Path;
 use clap::{ArgEnum, Args, ValueHint};
+use eyre::{eyre, Result, WrapErr};
 use rust_embed::RustEmbed;
+use std::fs;
 use std::path::PathBuf;
 
 #[derive(RustEmbed)]
-#[folder = "assets/templates"]
-struct Template;
+#[folder = "assets/templates/shell"]
+struct ShellTemplate;
+
+#[derive(RustEmbed)]
+#[folder = "assets/templates/mysql"]
+struct MysqlTemplate;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
 pub enum InitType {
     Shell,
-    Sql,
+    Postgres,
+    Mysql,
 }
 
 #[derive(Args, Debug)]
@@ -28,20 +36,54 @@ pub struct InitArgs {
     path: Option<PathBuf>,
 }
 
-pub fn init_repo(args: InitArgs) {
+fn write_file(file: &str, contents:&str) -> Result<()> {
+    println!("{:?}: {:?}", file, contents);
+    Ok(())
+}
+
+pub fn init_repo(args: InitArgs) -> Result<()> {
     // Folder structure:
-    //  - regrate/store/<name>/{up,down}.sh  (but nothing here yet)
     //  - regrate/template/{up,down}.sh  (copy of system template)
     //  - regrate/current/{up,down}.sh (copy of template)
     //  - regrate/config ?
 
-    for file in Template::iter() {
-        if let Some(up_script) = Template::get(file.as_ref()) {
-            // todo: Write file to location ./regrate/template if it's matching our selected
-            // template
-            println!("{:?}", std::str::from_utf8(up_script.data.as_ref()));
-        } else {
-            println!("NONE: {:?}", file);
+    let old = std::env::current_dir()?;
+
+    let res = {
+        if let Some(path) = args.path {
+            std::env::set_current_dir(&path)
+                .wrap_err_with(|| format!("Failed to change to path {:?}", path))?;
         }
-    }
+
+        fs::create_dir("regrate").wrap_err("Failed to create regrate directory")?;
+        fs::create_dir("regrate/store").wrap_err("failed to create regrate/store")?;
+        fs::create_dir("regrate/template").wrap_err("failed to create regrate/template")?;
+        fs::create_dir("regrate/current").wrap_err("failed to create regreate/current")?;
+
+        if !args.no_template {
+            match args.which {
+                InitType::Shell => {
+                    for file in ShellTemplate::iter() {
+                        let script = ShellTemplate::get(file.as_ref())
+                            .ok_or_else(|| eyre!("Failed to load shell template {:?}", file))?;
+                        let contents = std::str::from_utf8(script.data.as_ref())?;
+                        write_file(file.as_ref(), contents)?;
+                    }
+                },
+                InitType::Mysql => {
+                    for file in MysqlTemplate::iter() {
+                        let script = MysqlTemplate::get(file.as_ref())
+                            .ok_or_else(|| eyre!("Failed to load mysql template {:?}", file))?;
+                        let contents = std::str::from_utf8(script.data.as_ref())?;
+                        write_file(file.as_ref(), contents)?;
+                    }
+                },
+                InitType::Postgres => {},
+            };
+        }
+        Ok(())
+    };
+
+    std::env::set_current_dir(old)?;
+    return res;
 }

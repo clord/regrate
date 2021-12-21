@@ -1,4 +1,5 @@
 use clap::{Args, ValueHint};
+use eyre::Result;
 
 #[derive(Args, Debug)]
 #[clap(about, author, version)]
@@ -16,7 +17,7 @@ pub struct RunArgs {
     replace: String,
 }
 
-pub fn run_migrations(args: RunArgs) {
+pub fn run_migrations(args: RunArgs) -> Result<()> {
     //  - Compute the sequence of names
     //  - execute command on each name in sequence, passing name in place of first `{}` and
     //    setting REGRATE_VERSION environment variable.
@@ -25,4 +26,5 @@ pub fn run_migrations(args: RunArgs) {
         "RUN {:?} {:?} {:?}",
         args.command, args.replace, args.current
     );
+    Ok(())
 }
