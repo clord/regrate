@@ -14,5 +14,5 @@ pub fn commit_current(args: CommitArgs) -> Result<()> {
     //  - move current to the new name (regrates/store/<name>/{up,down}.sh)
     //  - create a new 'current' from template (or empty)
     println!("COMMIT {:?}", args.message);
-    return Ok(());
+    Ok(())
 }
