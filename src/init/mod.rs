@@ -23,18 +23,12 @@ pub struct InitArgs {
     #[clap(short, long)]
     no_template: bool,
 
-    /// Override the source for template to given directory (will be copied)
-    #[clap(short, long, value_hint = ValueHint::DirPath)]
-    template: Option<String>,
-
     /// place to insert migration directory (default $PWD)
     #[clap(short, long, value_hint = ValueHint::DirPath)]
     path: Option<PathBuf>,
 }
 
 pub fn init_repo(args: InitArgs) {
-    println!("INIT {:?}", args.which);
-
     // Folder structure:
     //  - regrate/store/<name>/{up,down}.sh  (but nothing here yet)
     //  - regrate/template/{up,down}.sh  (copy of system template)
@@ -43,6 +37,8 @@ pub fn init_repo(args: InitArgs) {
 
     for file in Template::iter() {
         if let Some(up_script) = Template::get(file.as_ref()) {
+            // todo: Write file to location ./regrate/template if it's matching our selected
+            // template
             println!("{:?}", std::str::from_utf8(up_script.data.as_ref()));
         } else {
             println!("NONE: {:?}", file);
