@@ -1,5 +1,10 @@
 use clap::{ArgEnum, Args, ValueHint};
+use rust_embed::RustEmbed;
 use std::path::PathBuf;
+
+#[derive(RustEmbed)]
+#[folder = "assets/templates"]
+struct Template;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
 pub enum InitType {
@@ -15,23 +20,32 @@ pub struct InitArgs {
     which: InitType,
 
     /// Do not generate a default template for this filetype
-    #[clap(short = 'n', long)]
+    #[clap(short, long)]
     no_template: bool,
 
     /// Override the source for template to given directory (will be copied)
-    #[clap(short = 't', long, value_hint = ValueHint::DirPath)]
+    #[clap(short, long, value_hint = ValueHint::DirPath)]
     template: Option<String>,
 
     /// place to insert migration directory (default $PWD)
-    #[clap(short = 'p', long, value_hint = ValueHint::DirPath)]
+    #[clap(short, long, value_hint = ValueHint::DirPath)]
     path: Option<PathBuf>,
 }
 
 pub fn init_repo(args: InitArgs) {
     println!("INIT {:?}", args.which);
+
     // Folder structure:
     //  - regrate/store/<name>/{up,down}.sh  (but nothing here yet)
     //  - regrate/template/{up,down}.sh  (copy of system template)
     //  - regrate/current/{up,down}.sh (copy of template)
     //  - regrate/config ?
+
+    for file in Template::iter() {
+        if let Some(up_script) = Template::get(file.as_ref()) {
+            println!("{:?}", std::str::from_utf8(up_script.data.as_ref()));
+        } else {
+            println!("NONE: {:?}", file);
+        }
+    }
 }
