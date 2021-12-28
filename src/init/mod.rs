@@ -1,8 +1,10 @@
+use crate::utils::exists_in_regrate;
+use crate::utils::write_file;
+use crate::utils::regrate_path;
 use clap::{ArgEnum, Args, ValueHint};
 use eyre::{eyre, Result, WrapErr};
 use rust_embed::RustEmbed;
 use std::fs;
-use std::path::Path;
 use std::path::PathBuf;
 
 #[derive(RustEmbed)]
@@ -47,10 +49,6 @@ pub struct InitArgs {
 pub fn init_repo(args: InitArgs) -> Result<()> {
     let old = std::env::current_dir()?;
 
-    let mut dest = PathBuf::new();
-    dest.push("regrate");
-    dest.push("template");
-
     let res = {
         if let Some(path) = args.path {
             std::env::set_current_dir(&path)
@@ -60,19 +58,22 @@ pub fn init_repo(args: InitArgs) -> Result<()> {
         if args.force {
             fs::remove_dir_all("regrate")?;
         }
+        else if exists_in_regrate("store")? {
+            return Err(eyre!("Regrate is already set up; aborting init (consider --force)"))
+        }
 
         fs::create_dir("regrate").wrap_err("Failed to create regrate directory")?;
         fs::create_dir("regrate/store").wrap_err("failed to create regrate/store")?;
         fs::create_dir("regrate/template").wrap_err("failed to create regrate/template")?;
-        fs::create_dir("regrate/current").wrap_err("failed to create regreate/current")?;
 
         if !args.no_template {
+            let dest = regrate_path("template")?;
             match args.which {
                 InitType::Shell => {
                     for file in ShellTemplate::iter() {
                         let script = ShellTemplate::get(&file)
                             .ok_or_else(|| eyre!("Failed to load template {:?}", file))?;
-                        write_file(&script.data, &file, dest.clone())?;
+                        write_file(&script.data, &file, &dest)?;
                     }
                 }
 
@@ -80,7 +81,7 @@ pub fn init_repo(args: InitArgs) -> Result<()> {
                     for file in MysqlTemplate::iter() {
                         let script = MysqlTemplate::get(&file)
                             .ok_or_else(|| eyre!("Failed to load template {:?}", file))?;
-                        write_file(&script.data, &file, dest.clone())?;
+                        write_file(&script.data, &file, &dest)?;
                     }
                 }
 
@@ -88,7 +89,7 @@ pub fn init_repo(args: InitArgs) -> Result<()> {
                     for file in PostgresTemplate::iter() {
                         let script = PostgresTemplate::get(file.as_ref())
                             .ok_or_else(|| eyre!("Failed to load template {:?}", file))?;
-                        write_file(&script.data, &file, dest.clone())?;
+                        write_file(&script.data, &file, &dest)?;
                     }
                 }
             };
@@ -101,15 +102,3 @@ pub fn init_repo(args: InitArgs) -> Result<()> {
     res
 }
 
-/// Write file from source to destination
-fn write_file(source: &[u8], dest_path: &str, mut dest_folder: PathBuf) -> Result<()> {
-    let contents = std::str::from_utf8(source)?;
-
-    let filename = Path::new(dest_path)
-        .file_name()
-        .ok_or_else(|| eyre!("Could not get filename"))?;
-    dest_folder.push(filename);
-
-    fs::write(dest_folder.as_path(), contents)?;
-    Ok(())
-}
