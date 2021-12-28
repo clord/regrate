@@ -23,7 +23,7 @@ enum Regrate {
     Commit(commit::CommitArgs),
 
     /// Start a new current migration
-    Create(create::CreateArgs),
+    Create,
 
     /// Run migrations in order
     Run(run::RunArgs),
@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     match Regrate::parse() {
         Regrate::Init(args) => init::init_repo(args).wrap_err("initializing new repo"),
         Regrate::Commit(args) => commit::commit_current(args).wrap_err("committing changes"),
-        Regrate::Create(args) => create::do_create(args).wrap_err("creating migration"),
+        Regrate::Create => create::do_create().wrap_err("creating migration"),
         Regrate::Run(args) => run::run_migrations(args).wrap_err("running migration"),
         Regrate::Resolve => resolve::resolve_conflicts().wrap_err("resolving conflicts"),
         Regrate::Generate(args) => {

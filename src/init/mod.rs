@@ -1,7 +1,8 @@
 use crate::utils::exists_in_regrate;
-use crate::utils::write_file;
 use crate::utils::regrate_path;
+use crate::utils::write_file;
 use clap::{ArgEnum, Args, ValueHint};
+use color_eyre::Help;
 use eyre::{eyre, Result, WrapErr};
 use rust_embed::RustEmbed;
 use std::fs;
@@ -57,9 +58,12 @@ pub fn init_repo(args: InitArgs) -> Result<()> {
 
         if args.force {
             fs::remove_dir_all("regrate")?;
-        }
-        else if exists_in_regrate("store")? {
-            return Err(eyre!("Regrate is already set up; aborting init (consider --force)"))
+        } else if exists_in_regrate("store")? {
+            return Err(
+                eyre!("Regrate is already set up; aborting init").with_suggestion(|| {
+                    "consider --force if you'd like to remove existing migrations"
+                }),
+            );
         }
 
         fs::create_dir("regrate").wrap_err("Failed to create regrate directory")?;
@@ -73,7 +77,7 @@ pub fn init_repo(args: InitArgs) -> Result<()> {
                     for file in ShellTemplate::iter() {
                         let script = ShellTemplate::get(&file)
                             .ok_or_else(|| eyre!("Failed to load template {:?}", file))?;
-                        write_file(&script.data, &file, &dest)?;
+                        write_file(&script.data, &file, &dest, true)?;
                     }
                 }
 
@@ -81,7 +85,7 @@ pub fn init_repo(args: InitArgs) -> Result<()> {
                     for file in MysqlTemplate::iter() {
                         let script = MysqlTemplate::get(&file)
                             .ok_or_else(|| eyre!("Failed to load template {:?}", file))?;
-                        write_file(&script.data, &file, &dest)?;
+                        write_file(&script.data, &file, &dest, false)?;
                     }
                 }
 
@@ -89,7 +93,7 @@ pub fn init_repo(args: InitArgs) -> Result<()> {
                     for file in PostgresTemplate::iter() {
                         let script = PostgresTemplate::get(file.as_ref())
                             .ok_or_else(|| eyre!("Failed to load template {:?}", file))?;
-                        write_file(&script.data, &file, &dest)?;
+                        write_file(&script.data, &file, &dest, false)?;
                     }
                 }
             };
@@ -101,4 +105,3 @@ pub fn init_repo(args: InitArgs) -> Result<()> {
     std::env::set_current_dir(old)?;
     res
 }
-

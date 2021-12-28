@@ -347,6 +347,7 @@ dependencies = [
  "color-eyre",
  "eyre",
  "rust-embed",
+ "walkdir",
 ]
 
 [[package]]

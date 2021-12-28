@@ -1,11 +1,13 @@
 use eyre::{eyre, Result};
-use std::path::{PathBuf,Path};
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::{Path, PathBuf};
 
-/// Checks if a given path is a valid regrate path (i.e., )
+/// Checks if a given path is a valid regrate directory
 pub fn exists_in_regrate(file_name: &str) -> Result<bool> {
     let path = regrate_path(file_name)?;
-    let metadata = std::fs::metadata(path)?;
-    Ok(metadata.is_dir())
+    Ok(path.exists())
 }
 
 /// error unless regrate is initialized
@@ -31,18 +33,29 @@ pub fn regrate_path(sub_path: &str) -> Result<std::path::PathBuf> {
     Ok(path)
 }
 
-/// Write file from source to destination
-pub fn write_file(source: &[u8], dest_path: &str, dest_folder: &Path) -> Result<()> {
+// Write bytes to destination file in destination folder, with optional executable flag
+pub fn write_file(
+    contents: &[u8],
+    dest_path: &str,
+    dest_folder: &Path,
+    is_exe: bool,
+) -> Result<()> {
     let mut dest_file = PathBuf::from(dest_folder);
-
-    let contents = std::str::from_utf8(source)?;
 
     let filename = Path::new(dest_path)
         .file_name()
-        .ok_or_else(|| eyre!("Could not get filename"))?;
+        .ok_or_else(|| eyre!("Could not get filename of {}", dest_path))?;
 
     dest_file.push(filename);
 
-    std::fs::write(dest_file.as_path(), contents)?;
+    let mut opts = OpenOptions::new();
+    let mut opts = opts.create(true).write(true);
+    if is_exe {
+        opts = opts.mode(0o755);
+    }
+
+    let mut f = opts.open(dest_file.as_path())?;
+    f.write_all(contents)?;
+
     Ok(())
 }
