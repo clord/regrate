@@ -13,3 +13,8 @@ rust-embed="6.3.0"
 walkdir = "2"
 eyre = "0.6"
 color-eyre = "0.5"
+sha2 = "0.10"
+bs58 = "0.4"
+fallible-iterator = "0.2"
+toml = "0.5"
+serde = { version = "1.0", features = ["derive"] }

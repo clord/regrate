@@ -4,11 +4,6 @@ use color_eyre::Help;
 use eyre::{eyre, Result};
 use walkdir::WalkDir;
 
-// #[derive(Args, Debug)]
-// #[clap(about, author, version)]
-// pub struct CreateArgs {
-// }
-
 pub fn do_create() -> Result<()> {
     require_regrate_inited()?;
     if exists_in_regrate("current")? {

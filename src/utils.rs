@@ -1,8 +1,7 @@
 use eyre::{eyre, Result};
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
+use std::{env, fs::OpenOptions, io::Write, path};
 
 /// Checks if a given path is a valid regrate directory
 pub fn exists_in_regrate(file_name: &str) -> Result<bool> {
@@ -20,14 +19,14 @@ pub fn require_regrate_inited() -> Result<()> {
     Ok(())
 }
 
-pub fn regrate_root() -> Result<std::path::PathBuf> {
-    let mut path = std::env::current_dir()?;
+pub fn regrate_root() -> Result<path::PathBuf> {
+    let mut path = env::current_dir()?;
     path.push("regrate");
     Ok(path)
 }
 
 /// Verify regreate is set up then pass regrate sub_path (which is not checked)
-pub fn regrate_path(sub_path: &str) -> Result<std::path::PathBuf> {
+pub fn regrate_path(sub_path: &str) -> Result<path::PathBuf> {
     let mut path = regrate_root()?;
     path.push(sub_path);
     Ok(path)

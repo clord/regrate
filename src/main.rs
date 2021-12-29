@@ -3,6 +3,7 @@ mod create;
 mod errors;
 mod gen;
 mod init;
+mod names;
 mod resolve;
 mod run;
 mod utils;
@@ -40,8 +41,8 @@ fn main() -> Result<()> {
 
     match Regrate::parse() {
         Regrate::Init(args) => init::init_repo(args).wrap_err("initializing new repo"),
-        Regrate::Commit(args) => commit::commit_current(args).wrap_err("committing changes"),
         Regrate::Create => create::do_create().wrap_err("creating migration"),
+        Regrate::Commit(args) => commit::commit_current(args).wrap_err("committing changes"),
         Regrate::Run(args) => run::run_migrations(args).wrap_err("running migration"),
         Regrate::Resolve => resolve::resolve_conflicts().wrap_err("resolving conflicts"),
         Regrate::Generate(args) => {

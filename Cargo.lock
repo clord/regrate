@@ -65,6 +65,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "block-buffer"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1d36a02058e76b040de25a4464ba1c80935655595b661505c8b39b664828b95"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
+name = "bs58"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
+
+[[package]]
 name = "cc"
 version = "1.0.72"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -152,11 +167,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto-common"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "683d6b536309245c849479fba3da410962a43ed8e51c26b729208ec0ac2798d0"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
 name = "digest"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
 dependencies = [
+ "generic-array",
+]
+
+[[package]]
+name = "digest"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b697d66081d42af4fba142d56918a3cb21dc8eb63372c6b85d14f44fb9c5979b"
+dependencies = [
+ "block-buffer 0.10.0",
+ "crypto-common",
  "generic-array",
 ]
 
@@ -169,6 +204,12 @@ dependencies = [
  "indenter",
  "once_cell",
 ]
+
+[[package]]
+name = "fallible-iterator"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
 name = "generic-array"
@@ -342,11 +383,16 @@ dependencies = [
 name = "regrate"
 version = "0.3.0"
 dependencies = [
+ "bs58",
  "clap",
  "clap_generate",
  "color-eyre",
  "eyre",
+ "fallible-iterator",
  "rust-embed",
+ "serde",
+ "sha2 0.10.0",
+ "toml",
  "walkdir",
 ]
 
@@ -380,7 +426,7 @@ version = "7.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad22c7226e4829104deab21df575e995bfbc4adfad13a595e387477f238c1aec"
 dependencies = [
- "sha2",
+ "sha2 0.9.8",
  "walkdir",
 ]
 
@@ -400,16 +446,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde"
+version = "1.0.132"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b9875c23cf305cd1fd7eb77234cbb705f21ea6a72c637a5c6db5fe4b8e7f008"
+dependencies = [
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_derive"
+version = "1.0.132"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ecc0db5cb2556c0e558887d9bbdcf6ac4471e83ff66cf696e5419024d1606276"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "sha2"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b69f9a4c9740d74c5baa3fd2e547f9525fa8088a8a958e0ca2409a514e33f5fa"
 dependencies = [
- "block-buffer",
+ "block-buffer 0.9.0",
  "cfg-if",
  "cpufeatures",
- "digest",
+ "digest 0.9.0",
  "opaque-debug",
+]
+
+[[package]]
+name = "sha2"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "900d964dd36bb15bcf2f2b35694c072feab74969a54f2bbeec7a2d725d2bdcb6"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest 0.10.1",
 ]
 
 [[package]]
@@ -460,6 +537,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8018d24e04c95ac8790716a5987d0fec4f8b27249ffa0f7d33f1369bdfb88cbd"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "toml"
+version = "0.5.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a31142970826733df8241ef35dc040ef98c679ab14d7c3e54d827099b3acecaa"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
