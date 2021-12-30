@@ -1,7 +1,9 @@
 use crate::names::StoreNameIterator;
+use crate::utils::exists_in_regrate;
 use crate::utils::regrate_path;
 use crate::utils::require_regrate_inited;
 use clap::Args;
+use color_eyre::Help;
 use eyre::{eyre, Context, Result};
 use fallible_iterator::FallibleIterator;
 use serde::Serialize;
@@ -22,6 +24,10 @@ struct Info {
 
 pub fn commit_current(args: CommitArgs) -> Result<()> {
     require_regrate_inited()?;
+    if !exists_in_regrate("current")? {
+        return Err(eyre!("No current migration, can not commit.")
+            .with_suggestion(|| "use `regrate create` to start a migration"));
+    }
     if let Some((name, path, _)) = StoreNameIterator::new().last()? {
         let parent = path.parent().ok_or(eyre!("Could not get parent path"))?;
         std::fs::create_dir_all(parent)?;
@@ -37,6 +43,7 @@ pub fn commit_current(args: CommitArgs) -> Result<()> {
 
         // move current to the new name
         println!("moving {:?} -> {:?}", current, path);
+        println!("use `regrate create` to start a new migration");
         std::fs::rename(current, path).wrap_err("renaming current to path")?;
     }
 
