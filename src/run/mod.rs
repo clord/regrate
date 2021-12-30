@@ -1,4 +1,5 @@
 use crate::names::StoreNameIterator;
+use crate::utils::require_regrate_inited;
 use clap::{AppSettings, Args, ValueHint};
 use fallible_iterator::FallibleIterator;
 
@@ -19,6 +20,7 @@ pub struct RunArgs {
 }
 
 pub fn run_migrations(args: RunArgs) -> Result<()> {
+    require_regrate_inited()?;
     let mut iter = StoreNameIterator::new();
     while let Some((name, next, path, next_path)) = iter.next()? {
         env::set_var("REGRATE_NAME", &name);
