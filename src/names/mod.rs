@@ -3,37 +3,32 @@ use eyre::{Report, Result};
 use walkdir::WalkDir;
 
 use sha2::{Digest, Sha256};
-use std::{fs, io};
+use std::{fs, io, mem};
 
 // Iterates the store
 #[derive(Debug)]
 pub struct StoreNameIterator {
     pub seed: String,
-    pub seed_exists: bool,
 }
 
 impl<'a> fallible_iterator::FallibleIterator for StoreNameIterator {
-    type Item = (String, std::path::PathBuf, bool);
+    type Item = (String, String, std::path::PathBuf, std::path::PathBuf);
     type Error = Report;
 
     fn next(&mut self) -> Result<Option<Self::Item>> {
-        let seed = &self.seed;
-        let mut root = std::path::PathBuf::from(regrate_path("store")?);
+        let mut current_path = regrate_path("store")?;
+        let mut next_path = current_path.clone();
 
         // encode name as two path components: first two characters and rest.
-        root.push(&seed[0..2]);
-        root.push(&seed[2..]);
+        current_path.push(&self.seed[0..2]);
+        current_path.push(&self.seed[2..]);
 
-        if !self.seed_exists {
-            return Ok(None);
-        }
-
-        if root.exists() && root.is_dir() {
-            self.seed_exists = true;
+        if current_path.exists() && current_path.is_dir() {
             let mut hasher = Sha256::new();
-            hasher.update(seed);
+            hasher.update(&self.seed);
+
             // iterate all files in the directory, updating hasher.
-            for entry in WalkDir::new(&root) {
+            for entry in WalkDir::new(&current_path) {
                 let entry = entry?;
                 let path = entry.path();
                 if !path.is_dir() {
@@ -42,13 +37,16 @@ impl<'a> fallible_iterator::FallibleIterator for StoreNameIterator {
                 }
             }
             let hash_bytes = hasher.finalize();
-            let name = bs58::encode(hash_bytes).into_string();
-            self.seed = name;
+            let mut name = bs58::encode(hash_bytes).into_string();
 
-            Ok(Some((self.seed.clone(), root, true)))
+            next_path.push(&name[0..2]);
+            next_path.push(&name[2..]);
+
+            mem::swap(&mut name, &mut self.seed);
+
+            Ok(Some((name, self.seed.clone(), current_path, next_path)))
         } else {
-            self.seed_exists = false;
-            Ok(Some((self.seed.clone(), root, false)))
+            Ok(None)
         }
     }
 }
@@ -60,9 +58,6 @@ impl StoreNameIterator {
         let seed = bs58::encode(v1hasher.finalize()).into_string();
         // Seed exists defaults to true, as if the "first" element is based on some unknown
         // previous that exists.
-        StoreNameIterator {
-            seed,
-            seed_exists: true,
-        }
+        StoreNameIterator { seed }
     }
 }

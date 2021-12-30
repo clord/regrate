@@ -28,23 +28,25 @@ pub fn commit_current(args: CommitArgs) -> Result<()> {
         return Err(eyre!("No current migration, can not commit.")
             .with_suggestion(|| "use `regrate create` to start a migration"));
     }
-    if let Some((name, path, _)) = StoreNameIterator::new().last()? {
-        let parent = path.parent().ok_or(eyre!("Could not get parent path"))?;
+    if let Some((_name, next, _path, next_path)) = StoreNameIterator::new().last()? {
+        let parent = next_path
+            .parent()
+            .ok_or_else(|| eyre!("Could not get parent path"))?;
         std::fs::create_dir_all(parent)?;
         let current = regrate_path("current")?;
 
         let info = Info {
             message: args.message,
-            name,
+            name: next,
         };
 
         let toml = toml::to_string(&info).wrap_err("generating info.toml")?;
         std::fs::write(current.join("info.toml"), toml).wrap_err("writing info.toml")?;
 
         // move current to the new name
-        println!("moving {:?} -> {:?}", current, path);
+        println!("moving {:?} -> {:?}", current, next_path);
         println!("use `regrate create` to start a new migration");
-        std::fs::rename(current, path).wrap_err("renaming current to path")?;
+        std::fs::rename(current, next_path).wrap_err("renaming current to path")?;
     }
 
     Ok(())
