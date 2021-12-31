@@ -5,7 +5,7 @@ use fallible_iterator::FallibleIterator;
 
 use eyre::{eyre, Result, WrapErr};
 
-use std::{env, path, process};
+use std::{env, process};
 
 #[derive(Args, Debug)]
 #[clap(about, author, version, setting = AppSettings::TrailingVarArg)]
@@ -27,8 +27,26 @@ pub fn run_migrations(args: RunArgs) -> Result<()> {
         env::set_var("REGRATE_NEXT_NAME", &next);
         env::set_var("REGRATE_NEXT_PATH", &next_path);
         env::set_var("REGRATE_PATH", &path);
+        let up_script = path.join("up.sh");
+        let down_script = path.join("down.sh");
 
-        run_migration_command(&args.command, &name, &next, &path, &next_path)?;
+        let args: Vec<&str> = args
+            .command
+            .iter()
+            .map(|x| match x.as_ref() {
+                "{name}" => &name,
+                "{path}" => path.to_str().unwrap_or("{path_invalidutf8}"),
+                "{up}" => up_script.to_str().unwrap_or("{up_invalidutf8}"),
+                "{down}" => down_script.to_str().unwrap_or("{down_invalidutf8}"),
+                "{next-path}" | "{next_path}" => {
+                    next_path.to_str().unwrap_or("{next_path_invalidutf8}")
+                }
+                "{next-name}" | "{next_name}" => &next,
+                x => x,
+            })
+            .collect();
+
+        run_migration_command(&args)?;
     }
 
     env::remove_var("REGRATE_NAME");
@@ -40,22 +58,8 @@ pub fn run_migrations(args: RunArgs) -> Result<()> {
     Ok(())
 }
 
-fn run_migration_command(
-    raw_command: &[String],
-    name: &str,
-    next: &str,
-    path: &path::Path,
-    next_path: &path::Path,
-) -> Result<()> {
-    if let Some((command, args)) = raw_command.split_first() {
-        let args = args.iter().map(|x| match x.as_ref() {
-            "{path}" => path.to_str().unwrap_or("{path_invalidutf8}"),
-            "{next_path}" => next_path.to_str().unwrap_or("{next_path_invalidutf8}"),
-            "{name}" => name,
-            "{next_name}" => next,
-            x => x,
-        });
-
+fn run_migration_command(command: &[&str]) -> Result<()> {
+    if let Some((command, args)) = command.split_first() {
         let status = process::Command::new(command)
             .args(args)
             .status()
