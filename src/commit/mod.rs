@@ -40,7 +40,7 @@ pub fn commit_current(args: CommitArgs) -> Result<()> {
             name: next,
         };
 
-        let toml = toml::to_string(&info).wrap_err("generating info.toml")?;
+        let toml = toml::to_string_pretty(&info).wrap_err("generating info.toml")?;
         std::fs::write(current.join("info.toml"), toml).wrap_err("writing info.toml")?;
 
         // move current to the new name

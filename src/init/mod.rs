@@ -1,7 +1,10 @@
+use crate::types::InitType;
+use crate::types::RepoConfig;
 use crate::utils::exists_in_regrate;
 use crate::utils::regrate_path;
+use crate::utils::regrate_root;
 use crate::utils::write_file;
-use clap::{ArgEnum, Args, ValueHint};
+use clap::{Args, ValueHint};
 use color_eyre::Help;
 use eyre::{eyre, Result, WrapErr};
 use rust_embed::RustEmbed;
@@ -19,13 +22,6 @@ struct PostgresTemplate;
 #[derive(RustEmbed)]
 #[folder = "assets/templates/mysql"]
 struct MysqlTemplate;
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
-pub enum InitType {
-    Shell,
-    Postgres,
-    Mysql,
-}
 
 #[derive(Args, Debug)]
 #[clap(about, author, version)]
@@ -69,6 +65,10 @@ pub fn init_repo(args: InitArgs) -> Result<()> {
         fs::create_dir("regrate").wrap_err("Failed to create regrate directory")?;
         fs::create_dir("regrate/store").wrap_err("failed to create regrate/store")?;
         fs::create_dir("regrate/template").wrap_err("failed to create regrate/template")?;
+
+        let config = RepoConfig { mode: args.which };
+        let toml = toml::to_string_pretty(&config).wrap_err("generate repo.toml")?;
+        std::fs::write(regrate_root()?.join("repo.toml"), toml).wrap_err("write repo.toml")?;
 
         if !args.no_template {
             let dest = regrate_path("template")?;

@@ -1,11 +1,12 @@
 use crate::names::StoreNameIterator;
+use crate::types::{InitType, RepoConfig};
+use crate::utils::regrate_root;
 use crate::utils::require_regrate_inited;
 use clap::{AppSettings, Args, ValueHint};
+use eyre::{eyre, Result, WrapErr};
 use fallible_iterator::FallibleIterator;
 
-use eyre::{eyre, Result, WrapErr};
-
-use std::{env, process};
+use std::{env, path, process};
 
 #[derive(Args, Debug)]
 #[clap(about, author, version, setting = AppSettings::TrailingVarArg)]
@@ -21,16 +22,35 @@ pub struct RunArgs {
 
 pub fn run_migrations(args: RunArgs) -> Result<()> {
     require_regrate_inited()?;
+
+    let contents = std::fs::read_to_string(regrate_root()?.join("repo.toml"))?;
+    let config: RepoConfig = toml::from_str(&contents)?;
+
     let mut iter = StoreNameIterator::new();
     while let Some((name, next, path, next_path)) = iter.next()? {
         env::set_var("REGRATE_NAME", &name);
         env::set_var("REGRATE_NEXT_NAME", &next);
         env::set_var("REGRATE_NEXT_PATH", &next_path);
         env::set_var("REGRATE_PATH", &path);
-        let up_script = path.join("up.sh");
-        let down_script = path.join("down.sh");
+        let up_script: path::PathBuf;
+        let down_script: path::PathBuf;
 
-        // Do variable expansion. 
+        match config.mode {
+            InitType::Shell => {
+                up_script = path.join("up.sh");
+                down_script = path.join("down.sh");
+            }
+            InitType::Mysql => {
+                up_script = path.join("up.mysql");
+                down_script = path.join("down.mysql");
+            }
+            InitType::Postgres => {
+                up_script = path.join("up.psql");
+                down_script = path.join("down.psql");
+            }
+        }
+
+        // Do variable expansion.
         // I purposely do not search inside strings since that gets into escaping madeness.
         let args: Vec<&str> = args
             .command

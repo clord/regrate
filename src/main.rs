@@ -6,6 +6,7 @@ mod init;
 mod names;
 mod resolve;
 mod run;
+mod types;
 mod utils;
 
 use clap::Parser;
