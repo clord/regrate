@@ -30,6 +30,8 @@ pub fn run_migrations(args: RunArgs) -> Result<()> {
         let up_script = path.join("up.sh");
         let down_script = path.join("down.sh");
 
+        // Do variable expansion. 
+        // I purposely do not search inside strings since that gets into escaping madeness.
         let args: Vec<&str> = args
             .command
             .iter()
