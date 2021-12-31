@@ -9,10 +9,16 @@ use std::{fs, io, mem};
 #[derive(Debug)]
 pub struct StoreNameIterator {
     pub seed: String,
+    pub first: bool,
 }
 
 impl<'a> fallible_iterator::FallibleIterator for StoreNameIterator {
-    type Item = (String, String, std::path::PathBuf, std::path::PathBuf);
+    type Item = (
+        Option<String>,
+        String,
+        Option<std::path::PathBuf>,
+        std::path::PathBuf,
+    );
     type Error = Report;
 
     fn next(&mut self) -> Result<Option<Self::Item>> {
@@ -24,6 +30,7 @@ impl<'a> fallible_iterator::FallibleIterator for StoreNameIterator {
         current_path.push(&self.seed[2..]);
 
         if current_path.exists() && current_path.is_dir() {
+            self.first = false;
             let mut hasher = Sha256::new();
             hasher.update(&self.seed);
 
@@ -44,7 +51,18 @@ impl<'a> fallible_iterator::FallibleIterator for StoreNameIterator {
 
             mem::swap(&mut name, &mut self.seed);
 
-            Ok(Some((name, self.seed.clone(), current_path, next_path)))
+            Ok(Some((
+                Some(name),
+                self.seed.clone(),
+                Some(current_path),
+                next_path,
+            )))
+        } else if self.first {
+            // force the first name to appear in the sequence
+            self.first = false;
+            next_path.push(&self.seed[0..2]);
+            next_path.push(&self.seed[2..]);
+            Ok(Some((None, self.seed.clone(), None, next_path)))
         } else {
             Ok(None)
         }
@@ -53,11 +71,13 @@ impl<'a> fallible_iterator::FallibleIterator for StoreNameIterator {
 
 impl StoreNameIterator {
     pub fn new() -> StoreNameIterator {
+        let seed = Self::first_hash();
+        StoreNameIterator { seed, first: true }
+    }
+
+    pub fn first_hash() -> String {
         let mut v1hasher = Sha256::new();
         v1hasher.update("#REGRATE v1 \npi: 3.141592653589793238462643383279502884197169399375105820974944592307816406286");
-        let seed = bs58::encode(v1hasher.finalize()).into_string();
-        // Seed exists defaults to true, as if the "first" element is based on some unknown
-        // previous that exists.
-        StoreNameIterator { seed }
+        bs58::encode(v1hasher.finalize()).into_string()
     }
 }

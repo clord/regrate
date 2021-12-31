@@ -27,7 +27,7 @@ pub fn run_migrations(args: RunArgs) -> Result<()> {
     let config: RepoConfig = toml::from_str(&contents)?;
 
     let mut iter = StoreNameIterator::new();
-    while let Some((name, next, path, next_path)) = iter.next()? {
+    while let Some((Some(name), next, Some(path), next_path)) = iter.next()? {
         env::set_var("REGRATE_NAME", &name);
         env::set_var("REGRATE_NEXT_NAME", &next);
         env::set_var("REGRATE_NEXT_PATH", &next_path);

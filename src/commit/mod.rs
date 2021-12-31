@@ -28,7 +28,7 @@ pub fn commit_current(args: CommitArgs) -> Result<()> {
         return Err(eyre!("No current migration, can not commit.")
             .with_suggestion(|| "use `regrate create` to start a migration"));
     }
-    if let Some((_name, next, _path, next_path)) = StoreNameIterator::new().last()? {
+    if let Some((_, next, _, next_path)) = StoreNameIterator::new().last()? {
         let parent = next_path
             .parent()
             .ok_or_else(|| eyre!("Could not get parent path"))?;
@@ -47,6 +47,8 @@ pub fn commit_current(args: CommitArgs) -> Result<()> {
         println!("moving {:?} -> {:?}", current, next_path);
         println!("use `regrate create` to start a new migration");
         std::fs::rename(current, next_path).wrap_err("renaming current to path")?;
+    } else {
+        return Err(eyre!("No elements in store"));
     }
 
     Ok(())
