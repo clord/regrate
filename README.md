@@ -5,37 +5,36 @@
 Manage migrations, apply them in order, deal with merge conflicts.
 
     # create a new shell-based migration
-    regrate init --shell
+    regrate init shell
 
     # Edit the up and down scripts (bash since --shell was used)
-    edit regrate/latest/up.sh
-    edit regrate/latest/down.sh
+    edit regrate/current/up.sh
+    edit regrate/current/down.sh
 
-    # Run the current migration (to test it out) by passing them to bash in order
-    regrate run -- bash {}
+    # Run migrations (including current) by executing them in order:
+    regrate run --current {up}
 
-    # Once the migration is working right, we can commit it.
+    # You can run any old command and do substitution:
+    regrate run --current echo {name}
+
+    # if your migrations are in SQL files, you might want to pass those to a command:
+    regrate run sqlite3 {up}
+
+    # Once the migration is working right, we can commit it
     regrate commit -m "add two columns"
 
     # With our migrations complete, we can push it up!
     git add -A && git commit -m "initial migration"
 
-    # Try to push it. first rebase onto latest...
+    # Try to push it. first rebase onto current...
     git rebase main ## ERROR, conflicts!
 
-    # Someone else already pushed a migration. you can either:
-    # 1. merge the migrations together (you're in dev and willing to reset your db)
-    # 2. better idea would be to move your local changes to a new migration:
-    regrate resolve
-
+    # Someone else already pushed a migration.
+    # move your local changes to a new migration and try again.
+    # in future we will have a command that resolves conflicts
+    # regrate resolve
     # regrate-resolve moves your local changes into a new migration, 
     # leaving your peer's as the base.
-    edit regrate/latest/up.sh # your peer added one of your columns!
-
-    regrate commit -m "add one column"
-
-    git add -A && git rebase --continue
-    git push # Yay!
 
 In summary,
 if anyone claims the next migration name
