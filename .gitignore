@@ -1,4 +1,8 @@
 /target
+.direnv
+.env
+.envrc
+/result
 .cargo-ok
 .DS_Store
 # For development, ignore testing files
