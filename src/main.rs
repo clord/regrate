@@ -1,6 +1,5 @@
 mod commit;
 mod create;
-mod errors;
 mod gen;
 mod init;
 mod names;
@@ -8,15 +7,16 @@ mod resolve;
 mod run;
 mod types;
 mod utils;
+mod valid;
 
 use clap::Parser;
 use color_eyre::eyre::Result;
 use eyre::WrapErr;
 
 #[derive(Parser, Debug)]
-#[clap(name = "regrate", about, version)]
-#[clap(author = "Christopher C Lord")]
-#[clap(bin_name = "regrate")]
+#[command(name = "regrate", about, version)]
+#[command(author = "Christopher C Lord")]
+#[command(bin_name = "regrate")]
 enum Regrate {
     /// Init a new migration
     Init(init::InitArgs),
@@ -29,6 +29,9 @@ enum Regrate {
 
     /// Run migrations in order
     Run(run::RunArgs),
+
+    /// Verify the store matches the name chain
+    Valid,
 
     /// Generate completions for your shell
     Generate(gen::GenerateArgs),
@@ -45,6 +48,7 @@ fn main() -> Result<()> {
         Regrate::Create => create::do_create().wrap_err("creating migration"),
         Regrate::Commit(args) => commit::commit_current(args).wrap_err("committing changes"),
         Regrate::Run(args) => run::run_migrations(args).wrap_err("running migration"),
+        Regrate::Valid => valid::validate().wrap_err("validating store"),
         Regrate::Resolve => resolve::resolve_conflicts().wrap_err("resolving conflicts"),
         Regrate::Generate(args) => {
             gen::generate_completion(args).wrap_err("generating shell autocomplete files")

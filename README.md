@@ -1,67 +1,100 @@
 # Regrate migration management
 
-## Introduction
-
-Manage migrations, apply them in order, deal with merge conflicts.
-
-    # create a new shell-based migration
-    regrate init shell
-
-    # Edit the up and down scripts (bash since --shell was used)
-    edit regrate/current/up.sh
-    edit regrate/current/down.sh
-
-    # Run migrations (including current) by executing them in order:
-    regrate run --current {up}
-
-    # You can run any old command and do substitution:
-    regrate run --current echo {name}
-
-    # if your migrations are in SQL files, you might want to pass those to a command:
-    regrate run sqlite3 {up}
-
-    # Once the migration is working right, we can commit it
-    regrate commit -m "add two columns"
-
-    # With our migrations complete, we can push it up!
-    git add -A && git commit -m "initial migration"
-
-    # Try to push it. first rebase onto current...
-    git rebase main ## ERROR, conflicts!
-
-    # Someone else already pushed a migration.
-    # move your local changes to a new migration and try again.
-    # in future we will have a command that resolves conflicts
-    # regrate resolve
-    # regrate-resolve moves your local changes into a new migration, 
-    # leaving your peer's as the base.
-
-In summary,
-if anyone claims the next migration name
-you get a merge conflict with their change.
-Regrate can help resolve your conflict markers into a new migration.
-
-Your scripts should be idempotent as they will be executed in order
-from the start every time.
-The current runtime version is not tracked by regrate.
-To help, `regrate-run` will set `REGRATE_INDEX` for each step of the migration,
-which can help with keeping track of whether a given script should run in a stateful
-environment (on completion, script would update a shared variable to `REGRATE_INDEX`).
-
-`regrate` will derive names from the contents of the migration scripts.
-This means migration scripts are no longer editable once committed. `regrate-valid`
-will complain about hash mismatches.
-This can be used in a pre-commit hook to detect bad changes.
-
-Also provided is a library that can be used to iterate migrations
-in the current directory. This is helpful for runtime. In this case,
-it is your responsibility to invoke the scripts as you see fit.
-Packages for other languages also exist and let you run migrations.
-
 [![Crates.io](https://img.shields.io/crates/v/regrate.svg)](https://crates.io/crates/regrate)
 [![Docs.rs](https://docs.rs/regrate/badge.svg)](https://docs.rs/regrate)
 [![CI](https://github.com/clord/regrate/workflows/CI/badge.svg)](https://github.com/clord/regrate/actions)
-[![Coverage Status](https://coveralls.io/repos/github/clord/regrate/badge.svg?branch=main)](https://coveralls.io/github/clord/regrate?branch=main)
+
+## Introduction
+
+Most migration tools name migrations with serial numbers or timestamps, so
+two people can land conflicting migrations without ever noticing. Regrate
+names each migration by hashing the previous one: if anyone else claims the
+next slot in the chain, you get an ordinary git merge conflict instead of a
+silent ordering bug — and `regrate resolve` turns that conflict back into a
+work-in-progress migration you can re-commit on top of theirs.
+
+Regrate doesn't talk to your database and doesn't track what has been
+applied; it manages an ordered, tamper-evident directory of migration
+scripts and runs the command of your choice over them, in order.
+
+## Quick start
+
+    # set up a shell-based migration repo (also: postgres, mysql)
+    regrate init shell
+
+    # start a migration and edit its scripts
+    regrate create
+    $EDITOR regrate/current/up.sh
+    $EDITOR regrate/current/down.sh
+
+    # run committed migrations in order; --current includes your WIP one
+    regrate run --current sh {up}
+
+    # you can run any command, with substitutions
+    regrate run echo {name}
+
+    # if your migrations are SQL files, pass them to your client
+    regrate run sqlite3 mydb.sqlite ".read {up}"
+
+    # happy with it? seal it into the chain and commit with git
+    regrate commit -m "add two columns"
+    git add -A && git commit -m "add two columns migration"
+
+If someone else pushed a migration first, your `git rebase` (or merge) will
+conflict inside `regrate/store`. Then:
+
+    # keep theirs in the store, move your version back to regrate/current
+    regrate resolve
+
+    # finish the rebase/merge, re-test your migration, and re-commit it
+    regrate commit -m "add two columns (rebased)"
+
+## Commands
+
+| command | what it does |
+|---|---|
+| `regrate init <shell\|postgres\|mysql>` | create the `regrate/` directory, config, and script templates |
+| `regrate create` | start a new `regrate/current` migration from the template |
+| `regrate commit -m <msg>` | seal `current` into the store under its chain name |
+| `regrate run [--current] <cmd>...` | run `<cmd>` once per migration, in order |
+| `regrate valid` | verify the store matches the name chain; lists orphans |
+| `regrate resolve` | after a git conflict in the store, keep upstream's migration and move yours back to `current` |
+| `regrate generate <shell>` | emit shell completions |
+
+### `run` substitutions and environment
+
+Arguments to `regrate run` that exactly match a placeholder are replaced
+for each migration: `{name}`, `{path}`, `{up}`, `{down}`, `{next-name}`,
+`{next-path}`. Placeholders inside larger strings are deliberately not
+expanded.
+
+Each invocation also receives environment variables: `REGRATE_INDEX`
+(zero-based position in the chain), `REGRATE_NAME`, `REGRATE_PATH`, and —
+for committed migrations — `REGRATE_NEXT_NAME` and `REGRATE_NEXT_PATH`.
+
+Your scripts should be idempotent, as they are executed in order from the
+start every time. Regrate does not track the applied version; in a stateful
+environment, a script can compare `REGRATE_INDEX` (or `REGRATE_NAME`)
+against a value it stores to decide whether it should run.
+
+## How it works
+
+The "current version" is left open: you can keep editing it, and the name
+it will receive is always well known in advance. To compute the next name,
+hash the current name together with the current migration's files (sorted
+by path, with file names and sizes mixed in, so the result doesn't depend
+on filesystem order). Repeating this from a fixed seed yields the whole
+chain of names.
+
+Because names are derived from contents, committed migrations are no longer
+editable: editing one invalidates the name of every migration after it.
+`regrate valid` detects this, and `regrate run` refuses to run a broken
+chain rather than silently skipping unreachable migrations. `regrate valid`
+works well as a pre-commit or CI check.
+
+And because the next name is the same for everyone, two people committing
+"the next migration" produce a git conflict in the same store path —
+which `regrate resolve` knows how to untangle.
 
 ## Installation
 
@@ -70,18 +103,6 @@ Packages for other languages also exist and let you run migrations.
 * Install the rust toolchain in order to have cargo installed by following
   [this](https://www.rust-lang.org/tools/install) guide.
 * Run `cargo install regrate`
-
-## How it works
-
-The "current version" is left open.
-You can make changes to it,
-and its name is always well known.
-If two people try to change the open version, it will be a merge conflict.
-To compute the next version from the current version, take the current version string,
-compute the hash of all migration scripts in that version,
-and concatenate the version and the hash.
-Hash the result and this is your next version name.
-This sequence can be repeated to generate a list of names.
 
 ## License
 
