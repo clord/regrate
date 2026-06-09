@@ -1,7 +1,7 @@
-use clap::ArgEnum;
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Deserialize, Serialize, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
+#[derive(Copy, Clone, Deserialize, Serialize, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum InitType {
     Shell,
     Postgres,

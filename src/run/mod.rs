@@ -1,23 +1,29 @@
-use crate::names::StoreNameIterator;
+use crate::names;
 use crate::types::{InitType, RepoConfig};
-use crate::utils::regrate_root;
-use crate::utils::require_regrate_inited;
-use clap::{AppSettings, Args, ValueHint};
+use crate::utils::{regrate_path, regrate_root, require_regrate_inited};
+use clap::{Args, ValueHint};
+use color_eyre::Help;
 use eyre::{eyre, Result, WrapErr};
-use fallible_iterator::FallibleIterator;
-
-use std::{env, path, process};
+use std::path::{Path, PathBuf};
+use std::process;
 
 #[derive(Args, Debug)]
-#[clap(about, author, version, setting = AppSettings::TrailingVarArg)]
 pub struct RunArgs {
     /// after migrating to latest, run the "current" migration too
-    #[clap(short, long)]
+    #[arg(short, long)]
     current: bool,
 
-    /// What command to execute migrations (replacements: {path}, {name})
-    #[clap(multiple_values(true), value_hint = ValueHint::CommandWithArguments)]
+    /// What command to execute migrations (replacements: {name}, {path}, {up}, {down}, {next-name}, {next-path})
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true, value_hint = ValueHint::CommandWithArguments)]
     command: Vec<String>,
+}
+
+struct Step {
+    index: usize,
+    name: String,
+    path: PathBuf,
+    next_name: Option<String>,
+    next_path: Option<PathBuf>,
 }
 
 pub fn run_migrations(args: RunArgs) -> Result<()> {
@@ -26,73 +32,113 @@ pub fn run_migrations(args: RunArgs) -> Result<()> {
     let contents = std::fs::read_to_string(regrate_root()?.join("repo.toml"))?;
     let config: RepoConfig = toml::from_str(&contents)?;
 
-    let mut iter = StoreNameIterator::new();
-    while let Some((Some(name), next, Some(path), next_path)) = iter.next()? {
-        env::set_var("REGRATE_NAME", &name);
-        env::set_var("REGRATE_NEXT_NAME", &next);
-        env::set_var("REGRATE_NEXT_PATH", &next_path);
-        env::set_var("REGRATE_PATH", &path);
-        let up_script: path::PathBuf;
-        let down_script: path::PathBuf;
+    let (migrations, pending_name, _) = names::chain()?;
 
-        match config.mode {
-            InitType::Shell => {
-                up_script = path.join("up.sh");
-                down_script = path.join("down.sh");
-            }
-            InitType::Mysql => {
-                up_script = path.join("up.mysql");
-                down_script = path.join("down.mysql");
-            }
-            InitType::Postgres => {
-                up_script = path.join("up.psql");
-                down_script = path.join("down.psql");
-            }
-        }
-
-        // Do variable expansion.
-        // I purposely do not search inside strings since that gets into escaping madeness.
-        let args: Vec<&str> = args
-            .command
-            .iter()
-            .map(|x| match x.as_ref() {
-                "{name}" => &name,
-                "{path}" => path.to_str().unwrap_or("{path_invalidutf8}"),
-                "{up}" => up_script.to_str().unwrap_or("{up_invalidutf8}"),
-                "{down}" => down_script.to_str().unwrap_or("{down_invalidutf8}"),
-                "{next-path}" | "{next_path}" => {
-                    next_path.to_str().unwrap_or("{next_path_invalidutf8}")
-                }
-                "{next-name}" | "{next_name}" => &next,
-                x => x,
-            })
-            .collect();
-
-        run_migration_command(&args)?;
+    // Refuse to run a store that has unreachable migrations: it means a
+    // committed migration was edited or a merge went wrong, and silently
+    // skipping the unreachable ones would migrate to the wrong state.
+    let orphans = names::orphans(&migrations)?;
+    if !orphans.is_empty() {
+        return Err(eyre!(
+            "store contains migrations not reachable from the name chain:\n  {}",
+            orphans.join("\n  ")
+        )
+        .with_note(|| "a committed migration was probably edited, or a merge left extras behind")
+        .with_suggestion(|| {
+            "run `regrate valid` for details, or `regrate resolve` after a merge"
+        }));
     }
 
-    env::remove_var("REGRATE_NAME");
-    env::remove_var("REGRATE_NEXT_NAME");
-    env::remove_var("REGRATE_NEXT_PATH");
-    env::remove_var("REGRATE_PATH");
+    let mut steps: Vec<Step> = migrations
+        .into_iter()
+        .map(|m| Step {
+            index: m.index,
+            name: m.name,
+            path: m.path,
+            next_name: Some(m.next_name),
+            next_path: Some(m.next_path),
+        })
+        .collect();
 
-    //  TODO: - Does not execute 'current' by default (use --current options for that)
+    if args.current {
+        let current = regrate_path("current")?;
+        if !current.is_dir() {
+            return Err(
+                eyre!("--current requested but there is no current migration")
+                    .with_suggestion(|| "use `regrate create` to start one"),
+            );
+        }
+        steps.push(Step {
+            index: steps.len(),
+            name: pending_name,
+            path: current,
+            next_name: None,
+            next_path: None,
+        });
+    }
+
+    for step in &steps {
+        run_step(step, config.mode, &args.command)?;
+    }
+
     Ok(())
 }
 
-fn run_migration_command(command: &[&str]) -> Result<()> {
-    if let Some((command, args)) = command.split_first() {
-        let status = process::Command::new(command)
-            .args(args)
-            .status()
-            .wrap_err("running migration tool")?;
+fn run_step(step: &Step, mode: InitType, command: &[String]) -> Result<()> {
+    let (up, down) = match mode {
+        InitType::Shell => ("up.sh", "down.sh"),
+        InitType::Mysql => ("up.mysql", "down.mysql"),
+        InitType::Postgres => ("up.psql", "down.psql"),
+    };
+    let up_script = step.path.join(up);
+    let down_script = step.path.join(down);
 
-        if status.success() {
-            Ok(())
-        } else {
-            Err(eyre!("{} exited with {}", command, status))
-        }
+    // Do variable expansion.
+    // I purposely do not search inside strings since that gets into escaping madness.
+    let args: Vec<&str> = command
+        .iter()
+        .map(|x| match x.as_ref() {
+            "{name}" => Ok(step.name.as_str()),
+            "{path}" => path_str(&step.path),
+            "{up}" => path_str(&up_script),
+            "{down}" => path_str(&down_script),
+            "{next-name}" | "{next_name}" => step
+                .next_name
+                .as_deref()
+                .ok_or_else(|| eyre!("{{next-name}} is not known for the current migration")),
+            "{next-path}" | "{next_path}" => {
+                step.next_path.as_deref().map(path_str).unwrap_or_else(|| {
+                    Err(eyre!(
+                        "{{next-path}} is not known for the current migration"
+                    ))
+                })
+            }
+            x => Ok(x),
+        })
+        .collect::<Result<_>>()?;
+
+    let (program, rest) = args
+        .split_first()
+        .ok_or_else(|| eyre!("run command required"))?;
+
+    let status = process::Command::new(program)
+        .args(rest)
+        .env("REGRATE_INDEX", step.index.to_string())
+        .env("REGRATE_NAME", &step.name)
+        .env("REGRATE_PATH", &step.path)
+        .envs(step.next_name.as_ref().map(|n| ("REGRATE_NEXT_NAME", n)))
+        .envs(step.next_path.as_ref().map(|p| ("REGRATE_NEXT_PATH", p)))
+        .status()
+        .wrap_err("running migration tool")?;
+
+    if status.success() {
+        Ok(())
     } else {
-        Err(eyre!("run command required"))
+        Err(eyre!("{} exited with {} on {}", program, status, step.name))
     }
+}
+
+fn path_str(path: &Path) -> Result<&str> {
+    path.to_str()
+        .ok_or_else(|| eyre!("path {:?} is not valid utf-8", path))
 }

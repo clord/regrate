@@ -12,8 +12,13 @@ jobs:
     runs-on: ${{ matrix.job.os }}
     strategy:
       matrix:
-        rust: [stable]
         job:
+          - os: macos-latest
+            os-name: macos
+            target: aarch64-apple-darwin
+            architecture: arm64
+            binary-postfix: ""
+            use-cross: false
           - os: macos-latest
             os-name: macos
             target: x86_64-apple-darwin
@@ -38,29 +43,25 @@ jobs:
             architecture: arm64
             binary-postfix: ""
             use-cross: true
-          - os: ubuntu-latest
-            os-name: linux
-            target: i686-unknown-linux-gnu
-            architecture: i686
-            binary-postfix: ""
-            use-cross: true
 
     steps:
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          profile: minimal
-          override: true
       - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Cargo build
-        uses: actions-rs/cargo@v1
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          command: build
-          use-cross: ${{ matrix.job.use-cross }}
-          toolchain: ${{ matrix.rust }}
-          args: --release --target ${{ matrix.job.target }}
+          targets: ${{ matrix.job.target }}
+      - name: Install cross
+        if: ${{ matrix.job.use-cross }}
+        run: cargo install cross --locked
+      - name: Cargo build
+        shell: bash
+        run: |
+          if [[ "${{ matrix.job.use-cross }}" == "true" ]]; then
+            cross build --release --target ${{ matrix.job.target }}
+          else
+            cargo build --release --target ${{ matrix.job.target }}
+          fi
 
       - name: install strip command
         shell: bash
@@ -94,7 +95,7 @@ jobs:
             shasum -a 256 $RELEASE_NAME.tar.gz > $RELEASE_NAME.sha256
           fi
       - name: Releasing assets
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             target/${{ matrix.job.target }}/release/regrate-*.tar.gz
@@ -106,13 +107,6 @@ jobs:
     name: Publishing to Cargo
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: publish
-          args: --token ${{ secrets.CARGO_API_KEY }}
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo publish --token ${{ secrets.CARGO_API_KEY }}

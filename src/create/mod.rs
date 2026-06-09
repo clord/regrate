@@ -20,12 +20,12 @@ pub fn do_create() -> Result<()> {
         for entry in WalkDir::new(&template) {
             let entry = entry?;
             let path = entry.path();
+            let relative = path.strip_prefix(&template)?;
+            let dest = current.join(relative);
 
             if path.is_dir() {
-                std::fs::create_dir_all(path)?;
+                std::fs::create_dir_all(dest)?;
             } else {
-                let relative = path.strip_prefix(&template)?;
-                let dest = current.join(relative);
                 std::fs::copy(path, dest)?;
             }
         }

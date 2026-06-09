@@ -1,5 +1,4 @@
 use eyre::{eyre, Result};
-use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::{env, fs::OpenOptions, io::Write, path};
 
@@ -48,10 +47,14 @@ pub fn write_file(
     dest_file.push(filename);
 
     let mut opts = OpenOptions::new();
-    let mut opts = opts.create(true).write(true);
+    let opts = opts.create(true).write(true).truncate(true);
+    #[cfg(unix)]
     if is_exe {
-        opts = opts.mode(0o755);
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o755);
     }
+    #[cfg(not(unix))]
+    let _ = is_exe;
 
     let mut f = opts.open(dest_file.as_path())?;
     f.write_all(contents)?;
